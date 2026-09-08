@@ -97,4 +97,82 @@ public class AccountController : Controller
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Index", "Home");
     }
+
+    [HttpGet]
+    public IActionResult ForgotPassword() => View();
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+
+        // PENTING: jangan kasih tau kalau email gak ketemu — biar gak bisa dipakai
+        // orang buat "menebak" email mana yang terdaftar (user enumeration).
+        if (user is not null)
+        {
+            user.PasswordResetToken = Guid.NewGuid().ToString("N");
+            user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(30);
+            await _db.SaveChangesAsync();
+
+            var resetLink = Url.Action(nameof(ResetPassword), "Account",
+                new { email = user.Email, token = user.PasswordResetToken }, Request.Scheme);
+
+            // TODO: ganti ini dengan kirim email beneran (lihat Fase 10).
+            // Untuk development, tampilkan link-nya langsung di halaman:
+            TempData["DevResetLink"] = resetLink;
+        }
+
+        return RedirectToAction(nameof(ForgotPasswordConfirmation));
+    }
+
+    [HttpGet]
+    public IActionResult ForgotPasswordConfirmation() => View();
+
+    [HttpGet]
+    public async Task<IActionResult> ResetPassword(string email, string token)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u =>
+            u.Email == email &&
+            u.PasswordResetToken == token &&
+            u.PasswordResetTokenExpiresAt > DateTime.UtcNow);
+
+        if (user is null)
+        {
+            TempData["Error"] = "Link reset tidak valid atau sudah kedaluwarsa.";
+            return RedirectToAction(nameof(ForgotPassword));
+        }
+
+        return View(new ResetPasswordViewModel { Email = email, Token = token });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u =>
+            u.Email == model.Email &&
+            u.PasswordResetToken == model.Token &&
+            u.PasswordResetTokenExpiresAt > DateTime.UtcNow);
+
+        if (user is null)
+        {
+            TempData["Error"] = "Link reset tidak valid atau sudah kedaluwarsa.";
+            return RedirectToAction(nameof(ForgotPassword));
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiresAt = null;
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Password berhasil diubah, silakan login.";
+        return RedirectToAction(nameof(Login));
+    }
+
+
 }

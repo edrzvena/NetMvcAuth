@@ -11,7 +11,7 @@ namespace NetMvcAuth.Models
         [Required, MaxLength(100)]
         public string FullName { get; set; } = string.Empty;
         [Required]
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
         //Feature forgot password
         public string? ResetPasswordToken { get; set; }
