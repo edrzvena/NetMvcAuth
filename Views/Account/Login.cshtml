@@ -2,7 +2,13 @@
 @{ ViewData["Title"] = "Login"; }
 
 <h2>Login</h2>
-<form asp-action="Login" method="post">
+
+@if (TempData["Success"] is string success)
+{
+    <div class="alert alert-success">@success</div>
+}
+
+<form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
     <div asp-validation-summary="All" class="text-danger"></div>
 
     <div class="mb-3">
@@ -15,11 +21,15 @@
         <input asp-for="Password" class="form-control" />
         <span asp-validation-for="Password" class="text-danger"></span>
     </div>
-    <div class="mb-3">
-        <label asp-for="RememberMe" class="form-label"></label>
+    <div class="mb-3 form-check">
         <input asp-for="RememberMe" class="form-check-input" />
+        <label asp-for="RememberMe" class="form-check-label"></label>
     </div>
     <button type="submit" class="btn btn-primary">Login</button>
+    <a asp-action="Register" class="btn btn-link">Belum punya akun? Register</a>
+    <div class="mt-2">
+        <a asp-action="ForgotPassword">Lupa password?</a>
+    </div>
 </form>
 
 @section Scripts {

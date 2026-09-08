@@ -19,6 +19,8 @@ public class AccountController : Controller
         _db = db;
     }
 
+    // ---------- REGISTER ----------
+
     [HttpGet]
     public IActionResult Register() => View();
 
@@ -49,6 +51,8 @@ public class AccountController : Controller
         return RedirectToAction(nameof(Login));
     }
 
+    // ---------- LOGIN / LOGOUT ----------
+
     [HttpGet]
     public IActionResult Login(string? returnUrl = null)
     {
@@ -71,11 +75,11 @@ public class AccountController : Controller
         }
 
         var claims = new List<Claim>
-    {
-        new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-        new(ClaimTypes.Name, user.FullName),
-        new(ClaimTypes.Email, user.Email),
-    };
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.FullName),
+            new(ClaimTypes.Email, user.Email),
+        };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
@@ -98,6 +102,8 @@ public class AccountController : Controller
         return RedirectToAction("Index", "Home");
     }
 
+    // ---------- FORGOT PASSWORD ----------
+
     [HttpGet]
     public IActionResult ForgotPassword() => View();
 
@@ -113,15 +119,15 @@ public class AccountController : Controller
         // orang buat "menebak" email mana yang terdaftar (user enumeration).
         if (user is not null)
         {
-            user.PasswordResetToken = Guid.NewGuid().ToString("N");
-            user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(30);
+            user.ResetPasswordToken = Guid.NewGuid().ToString("N");
+            user.PasswordResetTokenExpireAt = DateTime.UtcNow.AddMinutes(30);
             await _db.SaveChangesAsync();
 
             var resetLink = Url.Action(nameof(ResetPassword), "Account",
-                new { email = user.Email, token = user.PasswordResetToken }, Request.Scheme);
+                new { email = user.Email, token = user.ResetPasswordToken }, Request.Scheme);
 
-            // TODO: ganti ini dengan kirim email beneran (lihat Fase 10).
-            // Untuk development, tampilkan link-nya langsung di halaman:
+            // TODO: ganti ini dengan kirim email beneran (lihat bagian "Kirim email beneran" di bawah).
+            // Untuk development, tampilkan link-nya langsung di halaman konfirmasi:
             TempData["DevResetLink"] = resetLink;
         }
 
@@ -131,13 +137,15 @@ public class AccountController : Controller
     [HttpGet]
     public IActionResult ForgotPasswordConfirmation() => View();
 
+    // ---------- RESET PASSWORD ----------
+
     [HttpGet]
     public async Task<IActionResult> ResetPassword(string email, string token)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u =>
             u.Email == email &&
-            u.PasswordResetToken == token &&
-            u.PasswordResetTokenExpiresAt > DateTime.UtcNow);
+            u.ResetPasswordToken == token &&
+            u.PasswordResetTokenExpireAt > DateTime.UtcNow);
 
         if (user is null)
         {
@@ -156,8 +164,8 @@ public class AccountController : Controller
 
         var user = await _db.Users.FirstOrDefaultAsync(u =>
             u.Email == model.Email &&
-            u.PasswordResetToken == model.Token &&
-            u.PasswordResetTokenExpiresAt > DateTime.UtcNow);
+            u.ResetPasswordToken == model.Token &&
+            u.PasswordResetTokenExpireAt > DateTime.UtcNow);
 
         if (user is null)
         {
@@ -166,13 +174,11 @@ public class AccountController : Controller
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
-        user.PasswordResetToken = null;
-        user.PasswordResetTokenExpiresAt = null;
+        user.ResetPasswordToken = null;
+        user.PasswordResetTokenExpireAt = null;
         await _db.SaveChangesAsync();
 
         TempData["Success"] = "Password berhasil diubah, silakan login.";
         return RedirectToAction(nameof(Login));
     }
-
-
 }
